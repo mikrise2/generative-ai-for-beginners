@@ -1,4 +1,4 @@
-from openai import AzureOpenAI
+from openai import OpenAI
 import os
 import dotenv
 
@@ -6,23 +6,44 @@ import dotenv
 dotenv.load_dotenv()
 
 # configure Azure OpenAI service client 
-client = AzureOpenAI(
-  azure_endpoint = os.environ["AZURE_OPENAI_ENDPOINT"], 
-  api_key=os.environ['AZURE_OPENAI_KEY'],  
-  api_version = "2023-10-01-preview"
-  )
+client = OpenAI(
+    api_key=os.environ['OPENAI_API_KEY'],  # this is also the default, it can be omitted
+)
 
-deployment=os.environ['AZURE_OPENAI_DEPLOYMENT']
+deployment = os.environ['MODEL']
 
-# add your completion code
-prompt = "Complete the following: Once upon a time there was a"
-messages = [{"role": "user", "content": prompt}]  
-# make completion
-completion = client.chat.completions.create(model=deployment, messages=messages)
 
-# print response
-print(completion.choices[0].message.content)
+def check_existence(historical_person) -> bool:
+    question = [
+        {"role": "user",
+         "content": f"Is there a historical person named “{historical_person}”? Answer only “Yes” or “No”"}]
 
-#  very unhappy _____.
+    answer = client.chat.completions.create(model=deployment, messages=question, temperature=0.1).choices[
+        0].message.content.replace(".", "")
+    return answer == "Yes"
 
-# Once upon a time there was a very unhappy mermaid.
+
+print(
+    "Hi! I'm a bot that can become a historical character and communicate with you on his behalf! What kind of "
+    "historical character should I be?")
+person = None
+while True:
+    person = input()
+    if check_existence(person):
+        break
+    print("Sorry, I don't know such character. Please type another historical character.")
+
+messages = [
+    {"role": "system", "content": f"you're a bot who communicates on behalf of the historical figure “{person}”"},
+    {"role": "user", "content": "Introduce yourself and write a brief 2-sentence summary about yourself."}
+]
+
+greeting = client.chat.completions.create(model=deployment, messages=messages, temperature=0.1).choices[0].message.content
+print(greeting)
+messages.append({"role": "assistant", "content": greeting})
+while True:
+    prompt = input()
+    messages.append({"role": "user", "content": prompt})
+    answer = client.chat.completions.create(model=deployment, messages=messages, temperature=0.1).choices[0].message.content
+    print(answer)
+    messages.append({"role": "assistant", "content": prompt})
